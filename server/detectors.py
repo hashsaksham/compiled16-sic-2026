@@ -117,8 +117,8 @@ def _jaccard(a: frozenset, b: frozenset) -> float:
     return len(a & b) / len(a | b)
 
 
-def _semantic_loop(run: RunState) -> list[Signal]:
-    recent = run.steps[-5:]
+def _semantic_loop(steps: list[Step]) -> list[Signal]:
+    recent = steps[-5:]
     texts = [s for s in recent if len(s.text.strip()) >= 40]
     if len(texts) < 3:
         return []
@@ -198,16 +198,30 @@ def _budget(run: RunState) -> list[Signal]:
     return []
 
 
+def _since_last_intervention(steps: list[Step]) -> list[Step]:
+    """Steps from the most recent nudge/pause onward (the agent's reaction included).
+
+    Once the agent has been told it is stuck, only judge what it did afterwards. Otherwise a run that
+    changed course would still be flagged for repetitions that happened before the nudge.
+    """
+    for i in range(len(steps) - 1, -1, -1):
+        iv = steps[i].intervention or {}
+        if iv.get("action") in ("nudge", "pause"):
+            return steps[i:]
+    return steps
+
+
 def analyze(run: RunState) -> list[Signal]:
     """Run all detectors over the run's step history. Sorted by severity, highest first."""
     if not run.steps:
         return _budget(run)
-    window = run.steps[-WINDOW:]
+    recent = _since_last_intervention(run.steps)
+    window = recent[-WINDOW:]
     signals: list[Signal] = []
     signals += _repeat_tool_call(window)
     signals += _repeat_error(window)
     signals += _oscillation(window)
-    signals += _semantic_loop(run)
+    signals += _semantic_loop(recent)
     signals += _context_bloat(run)
     signals += _done_but_continuing(window)
     signals += _budget(run)

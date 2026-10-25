@@ -256,7 +256,7 @@ Tasks: §6.7, §6.8, `scripts/start.sh`, `scripts/demo.sh`, `tests/test_e2e.py`.
 
 ### Phase 5 — Integration, polish, real-model run (lead)
 - [x] Full demo runs end-to-end 3 times in a row with identical outcomes
-- [ ] With `ANTHROPIC_API_KEY` + `TRIPWIRE_UPSTREAM=https://api.anthropic.com`, a real Claude agent given an impossible task is caught (optional, if key available)
+- [x] With `ANTHROPIC_API_KEY` + `TRIPWIRE_UPSTREAM=https://api.anthropic.com`, a real Claude agent given an impossible task is caught (optional, if key available)
 - [x] README with 60-second quick start
 - [x] DONKEY.md updated to reflect final state
 
@@ -293,3 +293,4 @@ Built with **Claude Code** (Opus 5.5). Approach: the lead agent wrote this maste
 - Phase 4 done: e2e passes (6 tests). **Deviation from §6.7:** non-spender mock usage is 800+200×turn input / 80 output tokens (not 1500+400×turn / 150). The spec numbers tripped an unwanted budget-forecast downgrade on $1 runs. Spender input = 1500(t+1)+250t².
 - Phase 5: live integration on :8787/:8788, browser-tested. Outcomes: good completed (0 nudges), oscillator nudged→recovered→completed, looper paused→**killed by human from dashboard**, retrier paused→timeout kill, spender mock-large→mock-small→budget kill at step 15. Total spent $1.20, projected waste avoided $9.38. Full suite: 53 passed. Fixed: uvicorn `--timeout-graceful-shutdown 2` so open SSE streams don't block restarts.
 - Remaining: optional real-Claude run (needs `ANTHROPIC_API_KEY`), rehearse pitch, submit form (human, at venue).
+- Real-Claude run (`scripts/real.sh`, claude-sonnet-5-5, key from gitignored `.env`; Tripwire sends `claude-*` models to api.anthropic.com and everything else to the mock). **First run found a false positive:** Claude changed course after the nudge, but the 8-step window still held the pre-nudge 503s, so it was paused and then killed at the timeout. **Fix (detectors.py):** behavioural detectors (repeat_tool_call, repeat_error, oscillation, semantic_loop) only look at steps from the most recent nudge/pause onward, so the agent is judged on what it did after the warning. 2 regression tests added; 55 tests pass. **Re-run:** nudged once → recovered → completed with an honest failure report, $0.034. The ticked Phase 5 real-model item now has a stronger demo beat: "told never to give up, Tripwire talked it into stopping honestly."

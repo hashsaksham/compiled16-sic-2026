@@ -272,3 +272,22 @@ def test_pricing():
     assert pricing.cheaper_model("claude-haiku-5-5") == "claude-haiku-5-5"
     assert pricing.cheaper_model("mock-large") == "mock-small"
     assert pricing.cheaper_model("gpt-x") == "gpt-x"
+
+
+def test_agent_that_changes_course_after_nudge_is_not_flagged():
+    # Real-Claude case: 3 identical failing calls, nudge, then a different approach.
+    steps = _err_steps(3)
+    after = step(3, [tc("search_web", q="fulfillment-api 503 outage")])
+    after.intervention = {"action": "nudge", "level": 1}
+    steps += [after, step(4, [tc("read_file", path="README.md")])]
+    assert detectors.analyze(run_of(steps)) == []
+
+
+def test_agent_still_looping_after_nudge_is_flagged():
+    steps = _err_steps(3)
+    more = _err_steps(3)
+    for i, s in enumerate(more):
+        s.index = 3 + i
+    more[0].intervention = {"action": "nudge", "level": 1}
+    sigs = detectors.analyze(run_of(steps + more))
+    assert by_id(sigs, "repeat_error") is not None

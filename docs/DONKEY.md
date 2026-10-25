@@ -15,6 +15,7 @@
   - The "control room" screen (live dashboard): works on a laptop, a projector and a phone.
   - The "practice world" (a fake AI + five demo characters): the full demo test passes.
 - **Phase 5 (putting it together): done.** We ran the real system with the real screen. Every character ended the way we planned: *good* finished untouched, *oscillator* got a nudge and fixed itself, *looper* was paused and a human pressed **Kill** on the screen, *retrier* was paused and then stopped automatically when nobody answered, and *spender* was switched to a cheaper AI model and then stopped at its budget. Projected waste avoided: about $9.38, against $1.20 actually spent. All 53 automatic checks pass.
+- **Real Claude test: done.** We gave the real Claude AI a job and told it "keep retrying, never give up", but the service it needed was broken. After three identical failures, Tripwire whispered a warning. Claude changed course and wrote an honest "I couldn't do this, here's why" report. It cost about 3 cents. The first try showed a mistake in Tripwire: it was still holding Claude's *old* failures against it after Claude had already changed course, a bit like a referee still punishing a player for a foul they stopped making. We fixed it so that after a warning, Tripwire only judges what the agent does *next*.
 - **Still left (Phase 6):** practise the 2-minute demo and submit the form before 6:30 PM. That needs a person at the event. An optional extra is a run with the real Claude AI, which needs an API key.
 
 ---
