@@ -139,3 +139,15 @@ def test_looper_ladder_nudge_pause_approve_kill():
     seq = [a for a in actions if a != "none"]
     assert seq == ["nudge", "pause", "kill"]
     assert actions.index("nudge") == 3  # 3 identical calls seen -> nudge on the 4th request
+
+
+def test_strict_mode_pauses_instead_of_nudging_then_kills_after_approval():
+    from server.models import LEVEL_PAUSE, Signal
+    from server.policy import decide
+    run = RunState(id="s", name="s", mode="strict")
+    sig = [Signal("repeat_error", 0.6, "Same error 3 times.")]
+    assert decide(run, sig).action == "pause"
+    run.level, run.steps_since_nudge = LEVEL_PAUSE, 1  # human approved, one step later
+    assert decide(run, sig).action == "none"
+    run.steps_since_nudge = 2
+    assert decide(run, sig).action == "kill"

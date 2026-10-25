@@ -110,6 +110,7 @@ class RunState:
     events: list[dict[str, Any]] = field(default_factory=list)  # timeline of signal/intervention/status events
     saved_usd: float = 0.0  # projected waste avoided (set when killed)
     kill_reason: str = ""
+    mode: str = "normal"  # "normal" = full ladder; "strict" = skip the nudge, pause for a human straight away
     pause_deadline: float = 0.0  # epoch seconds when a held (paused) request auto-stops; 0 = not paused
 
     @property
@@ -153,6 +154,7 @@ class RunState:
             "model": self.downgrade_to or self.model,
             "original_model": self.model,
             "pause_deadline": self.pause_deadline,
+            "mode": self.mode,
             "last_action": self.last_action(),
             "stuck_score": round(self.stuck_score, 3),
             "level": self.level,

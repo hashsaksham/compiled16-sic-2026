@@ -800,6 +800,7 @@
     try {
       const [runs, stats, health] = await Promise.all([api("/api/runs"), api("/api/stats").catch(() => null), api("/api/health").catch(() => null)]);
       if (health && num(health.pause_timeout) > 0) { S.pauseTimeout = health.pause_timeout; renderLegend(); }
+      if (health && health.public) { const c = $("#hist-clear"); if (c) c.hidden = true; }
       const list = Array.isArray(runs) ? runs : [];
       if (resync) {
         const keep = new Set(list.map((r) => r.id));
@@ -840,6 +841,21 @@
       if (btn && btn.isConnected) btn.disabled = false;
     }
   }
+
+  $("#demo-btn").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      await api("/api/demo", { method: "POST", body: "{}" });
+      wipe();
+      await loadInitial(true);
+      toast("Demo started: 5 example agents. Two will need your decision in about 15 seconds.");
+    } catch (e) {
+      toast(/409/.test(e.message) ? "A demo is already running. Wait for it to finish." : "Could not start the demo: " + e.message, true);
+    } finally {
+      setTimeout(() => { if (btn.isConnected) btn.disabled = false; }, 3000);
+    }
+  });
 
   el.reset.addEventListener("click", () => armed(el.reset, "Click again to reset", async () => {
     try {

@@ -55,7 +55,13 @@ def decide(run: RunState, signals: list[Signal]) -> Decision:
         candidates.append(_decision(LEVEL_KILL, f"still critically stuck {run.steps_since_nudge} steps after a nudge: {top.message}"))
 
     # 3. Behavioural ladder.
-    if top is not None and b_score >= BEHAVIOURAL_THRESHOLD:
+    if top is not None and b_score >= BEHAVIOURAL_THRESHOLD and run.mode == "strict":
+        # High-stakes agents: a human decides instead of a nudge.
+        if run.level < LEVEL_PAUSE:
+            candidates.append(_decision(LEVEL_PAUSE, f"strict mode, a human decides: {top.message}"))
+        elif run.steps_since_nudge >= STEPS_BEFORE_ESCALATE:
+            candidates.append(_decision(LEVEL_KILL, f"still stuck after human approval: {top.message}"))
+    elif top is not None and b_score >= BEHAVIOURAL_THRESHOLD:
         if run.nudges_sent == 0:
             candidates.append(_decision(LEVEL_NUDGE, f"{top.detector}: {top.message}",
                                         nudge_text=nudge_text(behavioural)))

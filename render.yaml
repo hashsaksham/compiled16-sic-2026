@@ -1,0 +1,12 @@
+# Render Blueprint: New -> Blueprint -> pick this repo. Free plan sleeps after ~15 min idle.
+services:
+  - type: web
+    name: tripwire-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: PY=python scripts/start_public.sh
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 import time
 import traceback
 from contextlib import asynccontextmanager
@@ -35,6 +36,8 @@ from server.store import DEFAULT_BUDGET, store
 
 # ---- config (§7) -----------------------------------------------------------
 PORT = int(os.environ.get("TRIPWIRE_PORT", "8787"))
+# Public demo mode (hosted link): mock models only, no real Anthropic calls, history can't be wiped.
+PUBLIC = os.environ.get("TRIPWIRE_PUBLIC", "") == "1"
 PAUSE_TIMEOUT = float(os.environ.get("TRIPWIRE_PAUSE_TIMEOUT", "180"))
 ASSUMED_HORIZON = int(os.environ.get("TRIPWIRE_ASSUMED_HORIZON", "100"))
 NUDGE_PREFIX = "\n\n[TRIPWIRE SUPERVISOR NOTICE] "
@@ -237,6 +240,8 @@ async def handle_messages(request: Request, run_id: str) -> Response:
         return err(400, "request body must be a JSON object")
     if body.get("stream"):
         return err(400, "tripwire v1 supports stream=false only")
+    if PUBLIC and str(body.get("model", "")).startswith("claude"):
+        return err(403, "real Claude models are disabled on the public demo; run Tripwire locally to use them")
 
     h = request.headers
     budget: Optional[float] = None
@@ -249,6 +254,8 @@ async def handle_messages(request: Request, run_id: str) -> Response:
     # 1. get/create run
     run, created = store.get_or_create(run_id, name=h.get("x-tripwire-name", ""), goal=h.get("x-tripwire-goal", ""), budget=budget)
     run.last_seen = time.time()
+    if created and h.get("x-tripwire-mode", "").lower() == "strict":
+        run.mode = "strict"
     if not run.model:
         run.model = str(body.get("model") or "")
     if created:
@@ -339,7 +346,7 @@ async def handle_messages(request: Request, run_id: str) -> Response:
     if isinstance(data, dict):
         step = parse_step(run, data, str(body.get("model") or ""), applied)
         run.steps.append(step)
-        if run.nudges_sent > 0:
+        if run.nudges_sent > 0 or run.level >= LEVEL_PAUSE:
             run.steps_since_nudge += 1
         if run.status != "killed" and step.stop_reason == "end_turn" and not step.tool_calls:
             run.status = "completed"
@@ -498,13 +505,34 @@ async def history(run: str = "", action: str = "", limit: int = 500) -> list[dic
     return out
 
 
-@app.delete("/api/history")
-async def clear_history() -> dict[str, Any]:
+@app.delete("/api/history", response_model=None)
+async def clear_history():
+    if PUBLIC:
+        return err(403, "clearing history is disabled on the public demo")
     store.clear_history()
     store.publish(store.make_event("history_cleared", None, {}))
     return {"ok": True}
 
 
+_demo_proc: Optional[asyncio.subprocess.Process] = None
+
+
+@app.post("/api/demo", response_model=None)
+async def run_demo():
+    """Reset and launch the 5 mock agents (demo/run_demo.py) against this server. One demo at a time."""
+    global _demo_proc
+    if _demo_proc is not None and _demo_proc.returncode is None:
+        return err(409, "a demo is already running; wait for it to finish")
+    store.reset()
+    store.publish(store.make_event("reset", None, {}))
+    store.publish(store.make_event("stats", None, store.stats()))
+    _demo_proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-m", "demo.run_demo", "--tripwire", f"http://127.0.0.1:{PORT}",
+        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        env={**os.environ, "ANTHROPIC_API_KEY": "sk-demo-not-a-real-key"})
+    return {"ok": True, "started": True}
+
+
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "upstream": upstream.UPSTREAM, "real_upstream": upstream.REAL_UPSTREAM, "pause_timeout": PAUSE_TIMEOUT, "horizon": ASSUMED_HORIZON}
+    return {"ok": True, "upstream": upstream.UPSTREAM, "real_upstream": upstream.REAL_UPSTREAM, "pause_timeout": PAUSE_TIMEOUT, "public": PUBLIC, "horizon": ASSUMED_HORIZON}

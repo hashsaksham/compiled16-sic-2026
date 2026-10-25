@@ -38,6 +38,10 @@ SCENARIO_TOOLS: dict[str, set[str]] = {
     "stubborn_deploy": {"deploy"},
     "log_audit": {"read_file", "list_files", "write_file"},
 }
+# Production-touching agents run in Tripwire's strict mode: a human decides instead of a nudge.
+STRICT_SCENARIOS = {"stubborn_deploy"}
+# One tool call per step, so the context (and cost) grows step by step instead of in one giant turn.
+SERIAL_SCENARIOS = {"log_audit"}
 REAL_MODEL = "claude-sonnet-5-5"
 DEFAULT_MODEL = "mock-large"
 
@@ -134,7 +138,8 @@ def run_agent(scenario: str, run_id: str | None = None, budget: float = 1.0, mod
     client = anthropic.Anthropic(
         base_url=base if direct else f"{base}/r/{run_id}",
         api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-demo-not-a-real-key"),
-        default_headers={"X-Tripwire-Name": run_id, "X-Tripwire-Goal": goal, "X-Tripwire-Budget": str(budget)},
+        default_headers={"X-Tripwire-Name": run_id, "X-Tripwire-Goal": goal, "X-Tripwire-Budget": str(budget),
+                         **({"X-Tripwire-Mode": "strict"} if scenario in STRICT_SCENARIOS else {})},
         max_retries=0,
         timeout=180.0,
     )
@@ -145,8 +150,10 @@ def run_agent(scenario: str, run_id: str | None = None, budget: float = 1.0, mod
 
     for step in range(max_steps):
         try:
+            extra = ({"tool_choice": {"type": "auto", "disable_parallel_tool_use": True}}
+                     if scenario in SERIAL_SCENARIOS else {})
             resp = client.messages.create(model=model, max_tokens=1024, system=system, tools=tools,
-                                          messages=messages)
+                                          messages=messages, **extra)
         except anthropic.APIError as e:
             say(f"API error at step {step}: {e}")
             return {"outcome": "error", "steps": step, "error": str(e)}

@@ -78,6 +78,9 @@ a { color: var(--text-2); }
 .btn-round { width: 30px; height: 30px; padding: 0; border-radius: 50%; border-color: var(--line-2); }
 .btn-round.on { background: var(--panel-2); color: var(--text); }
 .btn-danger { color: #e9a19b; }
+.btn-primary { background: #e6e8eb; border-color: #e6e8eb; color: #111418; }
+.btn-primary:hover { background: #ffffff; border-color: #ffffff; }
+.public-note { font-size: var(--s); color: var(--text-2); }
 .btn.confirm { border-color: var(--c-stop) !important; color: #fff !important; background: color-mix(in srgb, var(--c-stop) 30%, transparent) !important; }
 .btn-approve { background: color-mix(in srgb, var(--c-finished) 18%, var(--panel)); border-color: color-mix(in srgb, var(--c-finished) 60%, transparent); }
 .btn-approve:hover { background: color-mix(in srgb, var(--c-finished) 28%, var(--panel)); border-color: var(--c-finished); }
