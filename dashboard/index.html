@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tripwire — Mission Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0d14'/%3E%3Cpath d='M4 20h7l3-9 4 14 3-8h7' stroke='%23fb923c' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 20h8l3-9 4 14 3-8h8" /></svg>
+      <div class="brand-text">
+        <h1>Tripwire</h1>
+        <span class="tagline">circuit breaker for AI agents</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="conn" class="conn conn-connecting" title="Live stream status"><i></i><span>connecting</span></span>
+      <button id="reset-btn" class="btn btn-ghost" type="button">Reset demo</button>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="Fleet statistics">
+    <div class="stat stat-hero">
+      <div class="stat-label">Projected waste avoided</div>
+      <div class="stat-value" id="stat-saved">$0.00</div>
+      <div class="stat-sub" id="stat-saved-sub">by stopping stuck agents early</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Active runs</div>
+      <div class="stat-value" id="stat-active">0</div>
+      <div class="stat-sub" id="stat-active-sub">0 total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total spent</div>
+      <div class="stat-value" id="stat-spent">$0.00</div>
+      <div class="stat-sub">LLM cost so far</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Nudges sent</div>
+      <div class="stat-value" id="stat-nudges">0</div>
+      <div class="stat-sub" id="stat-killed-sub">0 killed</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label" title="Recovered after nudge">Recovered</div>
+      <div class="stat-value stat-good" id="stat-recovered">0</div>
+      <div class="stat-sub" id="stat-completed-sub">after a nudge</div>
+    </div>
+  </section>
+
+  <main class="layout">
+    <section class="runs-wrap" aria-label="Agent runs">
+      <div id="runs" class="runs"></div>
+      <div id="empty" class="empty" hidden>
+        <div class="empty-icon">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 20h8l3-9 4 14 3-8h8" /></svg>
+        </div>
+        <h2>No agents connected yet</h2>
+        <p>Point any agent at Tripwire by changing one line — the API base URL. Every step is watched; stuck agents get nudged, downgraded, paused or stopped.</p>
+        <pre class="code"><span class="c-kw">client</span> = Anthropic(
+    <span class="c-hl">base_url=<span class="c-str">"<span id="empty-url">http://localhost:8787</span>/r/&lt;run-id&gt;"</span></span>
+)</pre>
+        <p class="empty-hint">Or run the demo: <code>scripts/demo.sh</code></p>
+      </div>
+    </section>
+
+    <aside class="feed-wrap" aria-label="Live event feed">
+      <div class="feed-head">
+        <h2>Live feed</h2>
+        <span class="feed-count" id="feed-count"></span>
+      </div>
+      <ol id="feed" class="feed"></ol>
+      <div id="feed-empty" class="feed-empty">Waiting for events…</div>
+    </aside>
+  </main>
+
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="drawer" class="drawer" aria-hidden="true" role="dialog" aria-label="Run details">
+    <div class="drawer-head">
+      <div class="drawer-title">
+        <div class="drawer-name-row">
+          <h2 id="drawer-name">Run</h2>
+          <span id="drawer-pill" class="pill"></span>
+        </div>
+        <div id="drawer-goal" class="drawer-goal"></div>
+        <div id="drawer-meta" class="drawer-meta"></div>
+      </div>
+      <button id="drawer-close" class="btn btn-icon" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="timeline" type="button" role="tab">Step timeline</button>
+      <button class="tab" data-tab="report" type="button" role="tab">View post-mortem</button>
+      <a id="drawer-raw" class="tab-link" href="#" target="_blank" rel="noopener">raw .md ↗</a>
+    </div>
+    <div id="drawer-body" class="drawer-body"></div>
+  </aside>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
