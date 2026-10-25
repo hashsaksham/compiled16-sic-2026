@@ -25,9 +25,8 @@ scripts/demo.sh         # 5 agents: good, looper, oscillator, retrier, spender
 
 To use real Claude, set `ANTHROPIC_API_KEY` and `TRIPWIRE_UPSTREAM=https://api.anthropic.com`.
 
-## Docs
-- [docs/MASTER.md](docs/MASTER.md): full spec, contracts, phases, test checklists
-- [docs/DONKEY.md](docs/DONKEY.md): the same thing in plain English
+## How we used AI coding tools
+We built Tripwire with Claude Code (Opus 5.5). The lead agent first wrote a full spec and froze a shared data contract (`server/models.py`). It then ran four sub-agents in parallel, each owning its own files: the detection engine, the proxy/API, the dashboard, and a mock world with demo agents. Each sub-agent had its own test checklist. The lead put the parts together, ran end-to-end tests and a real-Claude test, and fixed what those tests found. The real-Claude run exposed a false-positive bug, which we fixed and covered with a regression test. What made the approach work was building contract-first, so parallel agents never had merge conflicts, and testing against a deterministic mock LLM, so the whole system can be tested offline.
 
 ## Tests
 ```bash
