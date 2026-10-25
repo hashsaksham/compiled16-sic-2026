@@ -3,105 +3,127 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tripwire — Mission Control</title>
+  <title>Tripwire</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0d14'/%3E%3Cpath d='M4 20h7l3-9 4 14 3-8h7' stroke='%23fb923c' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315181e'/%3E%3Cpath d='M4 20h7l3-9 4 14 3-8h7' stroke='%23e6e8eb' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
+  <header class="top">
+    <div class="brand" title="Tripwire supervises your AI agents and steps in when one gets stuck">
       <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 20h8l3-9 4 14 3-8h8" /></svg>
-      <div class="brand-text">
-        <h1>Tripwire</h1>
-        <span class="tagline">circuit breaker for AI agents</span>
-      </div>
+      <span>Tripwire</span>
     </div>
-    <div class="topbar-right">
-      <span id="conn" class="conn conn-connecting" title="Live stream status"><i></i><span>connecting</span></span>
-      <button id="reset-btn" class="btn btn-ghost" type="button">Reset demo</button>
+    <div class="summary" aria-label="Summary">
+      <span title="Agents still working right now"><b id="sum-active">0</b> active</span>
+      <span id="sum-needs-wrap" class="sum-needs" title="Agents paused and waiting for you to click Approve or Stop"><b id="sum-needs">0</b> need you</span>
+      <span title="Money spent on AI model calls since the last reset"><b id="sum-spent">$0.00</b> spent</span>
+      <span title="Money Tripwire estimates it saved by stopping stuck agents early (projected over a typical run)"><b id="sum-saved">$0.00</b> waste avoided</span>
+    </div>
+    <div class="top-right">
+      <span class="session" title="How long this page has been open and watching"><span class="hide-sm">Watching </span><b id="session-time" class="mono">0:00</b></span>
+      <span id="conn" class="conn" title="Connection to Tripwire"><i></i><span class="hide-sm">connecting</span></span>
+      <button id="help-btn" class="btn btn-quiet btn-round" type="button" aria-expanded="false" aria-controls="legend" title="What do Nudge, Downgrade, Pause and Stop mean?">?</button>
+      <button id="reset-btn" class="btn btn-quiet" type="button" title="Remove all runs from the screen to start the demo again. Saved history is kept.">Reset demo</button>
     </div>
   </header>
 
-  <section class="stats" aria-label="Fleet statistics">
-    <div class="stat stat-hero">
-      <div class="stat-label">Projected waste avoided</div>
-      <div class="stat-value" id="stat-saved">$0.00</div>
-      <div class="stat-sub" id="stat-saved-sub">by stopping stuck agents early</div>
+  <div id="legend" class="legend" hidden role="dialog" aria-label="What Tripwire does">
+    <div class="legend-head">
+      <b>Tripwire's 4 steps</b>
+      <button id="legend-close" class="btn btn-quiet btn-round" type="button" title="Close" aria-label="Close">✕</button>
     </div>
-    <div class="stat">
-      <div class="stat-label">Active runs</div>
-      <div class="stat-value" id="stat-active">0</div>
-      <div class="stat-sub" id="stat-active-sub">0 total</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Total spent</div>
-      <div class="stat-value" id="stat-spent">$0.00</div>
-      <div class="stat-sub">LLM cost so far</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Nudges sent</div>
-      <div class="stat-value" id="stat-nudges">0</div>
-      <div class="stat-sub" id="stat-killed-sub">0 killed</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label" title="Recovered after nudge">Recovered</div>
-      <div class="stat-value stat-good" id="stat-recovered">0</div>
-      <div class="stat-sub" id="stat-completed-sub">after a nudge</div>
-    </div>
-  </section>
+    <p class="muted">It tries the gentlest step first and only goes further if the agent stays stuck.</p>
+    <ol id="legend-list" class="legend-list"></ol>
+    <p class="muted legend-foot"><span class="chip c-finished"><i></i>Finished</span> completed normally<br><span class="chip c-recovered"><i></i>Recovered</span> fixed itself after a nudge</p>
+  </div>
 
-  <main class="layout">
-    <section class="runs-wrap" aria-label="Agent runs">
-      <div id="runs" class="runs"></div>
-      <div id="empty" class="empty" hidden>
-        <div class="empty-icon">
-          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 20h8l3-9 4 14 3-8h8" /></svg>
+  <main class="main">
+    <section id="needs" class="needs" aria-label="Needs your decision" aria-live="polite"></section>
+
+    <nav class="views" role="tablist" aria-label="Main view">
+      <button class="view-tab" data-view="runs" type="button" role="tab" title="All agent runs">Runs <span class="count" id="runs-count">0</span></button>
+      <button class="view-tab" data-view="history" type="button" role="tab" title="Everything Tripwire did, newest first. Updates live and is saved permanently, even across resets and restarts.">
+        History <span class="count" id="hist-count">0</span><span class="live" id="live-ind"><i></i>Live</span><span class="new-badge" id="hist-new" hidden></span>
+      </button>
+    </nav>
+
+    <!-- RUNS -->
+    <section class="view" data-pane="runs">
+      <div class="toolbar">
+        <div class="filters" role="tablist" aria-label="Filter runs">
+          <button class="ftab" data-filter="all" type="button" title="Every run">All <span data-count="all">0</span></button>
+          <button class="ftab ftab-needs" data-filter="needs" type="button" title="Paused, waiting for your decision">Needs you <span data-count="needs">0</span></button>
+          <button class="ftab" data-filter="running" type="button" title="Still working (including nudged or downgraded ones)">Running <span data-count="running">0</span></button>
+          <button class="ftab" data-filter="finished" type="button" title="Completed their task">Finished <span data-count="finished">0</span></button>
+          <button class="ftab" data-filter="stopped" type="button" title="Ended by Tripwire or by you">Stopped <span data-count="stopped">0</span></button>
         </div>
-        <h2>No agents connected yet</h2>
-        <p>Point any agent at Tripwire by changing one line — the API base URL. Every step is watched; stuck agents get nudged, downgraded, paused or stopped.</p>
-        <pre class="code"><span class="c-kw">client</span> = Anthropic(
-    <span class="c-hl">base_url=<span class="c-str">"<span id="empty-url">http://localhost:8787</span>/r/&lt;run-id&gt;"</span></span>
-)</pre>
-        <p class="empty-hint">Or run the demo: <code>scripts/demo.sh</code></p>
+        <div class="tools">
+          <input id="run-q" class="input" type="search" placeholder="Search runs" title="Search by agent name, id or goal">
+          <select id="run-sort" class="input" title="Sort the list">
+            <option value="status">Needs attention first</option>
+            <option value="newest">Newest first</option>
+            <option value="cost">Highest cost</option>
+            <option value="stuck">Most stuck</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
       </div>
+
+      <div class="table" role="table" aria-label="Agent runs">
+        <div class="row head" role="row">
+          <span></span><span>Agent</span><span>What's happening</span><span>Step taken</span>
+          <span title="Nudge › Downgrade › Pause › Stop. Filled dot = used on this run.">Ladder</span>
+          <span>Spent / budget</span><span class="r">Time</span><span class="r">Steps</span>
+        </div>
+        <div id="rows" class="rows"></div>
+      </div>
+      <div id="runs-empty" class="empty" hidden></div>
     </section>
 
-    <aside class="feed-wrap" aria-label="Live event feed">
-      <div class="feed-head">
-        <h2>Live feed</h2>
-        <span class="feed-count" id="feed-count"></span>
+    <!-- HISTORY -->
+    <section class="view" data-pane="history" hidden>
+      <div class="toolbar">
+        <div class="filters" id="hchips" aria-label="Filter history"></div>
+        <div class="tools">
+          <select id="hist-run" class="input" title="Only show one agent"><option value="">All agents</option></select>
+          <input id="hist-q" class="input" type="search" placeholder="Search history" title="Search by agent name or what happened">
+        </div>
       </div>
-      <ol id="feed" class="feed"></ol>
-      <div id="feed-empty" class="feed-empty">Waiting for events…</div>
-    </aside>
+      <div class="hist-bar">
+        <span class="muted" id="hist-shown"></span>
+        <span class="hist-actions">
+          <button class="btn btn-quiet" id="exp-csv" type="button" title="Download the events shown below as a CSV spreadsheet">Export CSV</button>
+          <button class="btn btn-quiet" id="exp-json" type="button" title="Download the events shown below as a JSON file">Export JSON</button>
+          <button class="btn btn-quiet btn-danger" id="hist-clear" type="button" title="Permanently delete all saved history (asks you to click twice)">Clear history</button>
+        </span>
+      </div>
+      <ol id="hist" class="hist"></ol>
+      <div id="hist-empty" class="empty" hidden></div>
+    </section>
   </main>
 
   <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
   <aside id="drawer" class="drawer" aria-hidden="true" role="dialog" aria-label="Run details">
     <div class="drawer-head">
       <div class="drawer-title">
-        <div class="drawer-name-row">
-          <h2 id="drawer-name">Run</h2>
-          <span id="drawer-pill" class="pill"></span>
-        </div>
-        <div id="drawer-goal" class="drawer-goal"></div>
-        <div id="drawer-meta" class="drawer-meta"></div>
+        <h2 id="drawer-name">Run</h2>
+        <div id="drawer-goal" class="muted"></div>
       </div>
-      <button id="drawer-close" class="btn btn-icon" type="button" aria-label="Close">✕</button>
+      <button id="drawer-close" class="btn btn-quiet btn-round" type="button" aria-label="Close" title="Close (Esc)">✕</button>
     </div>
-    <div class="tabs" role="tablist">
-      <button class="tab active" data-tab="timeline" type="button" role="tab">Step timeline</button>
-      <button class="tab" data-tab="report" type="button" role="tab">View post-mortem</button>
-      <a id="drawer-raw" class="tab-link" href="#" target="_blank" rel="noopener">raw .md ↗</a>
+    <div id="drawer-summary" class="drawer-summary"></div>
+    <div class="dtabs" role="tablist">
+      <button class="dtab active" data-tab="timeline" type="button" role="tab" title="Every step the agent took, and where Tripwire stepped in">Steps</button>
+      <button class="dtab" data-tab="report" type="button" role="tab" title="Written summary: what went wrong and what Tripwire did">Post-mortem</button>
+      <a id="drawer-raw" class="dtab-link" href="#" target="_blank" rel="noopener" title="Open the report as a Markdown file">raw .md ↗</a>
     </div>
     <div id="drawer-body" class="drawer-body"></div>
   </aside>
 
   <div id="toast" class="toast" hidden></div>
-
   <script src="/static/app.js"></script>
 </body>
 </html>

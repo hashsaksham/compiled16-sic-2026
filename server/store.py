@@ -5,13 +5,19 @@ Owner: Agent A. Single-process, asyncio-only (no threads touch this).
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
+from collections import deque
 from typing import Any, Optional
 
 from server.models import RunState
 
 DEFAULT_BUDGET = float(os.environ.get("TRIPWIRE_DEFAULT_BUDGET", "1.00"))
+# Feed history survives demo resets and server restarts (append-only JSONL).
+HISTORY_PATH = os.environ.get("TRIPWIRE_HISTORY", "logs/history.jsonl")
+HISTORY_TYPES = {"created", "intervention", "human_action", "resumed", "recovered", "completed", "killed"}
+HISTORY_MAX = 5000
 
 
 class Store:
@@ -25,6 +31,8 @@ class Store:
         self.calm_streak: dict[str, int] = {}
         self.recovered: set[str] = set()
         self._subscribers: set[asyncio.Queue] = set()
+        self.history: deque[dict[str, Any]] = deque(maxlen=HISTORY_MAX)
+        self._load_history()
 
     # ---- runs -------------------------------------------------------------
     def get(self, run_id: str) -> Optional[RunState]:
@@ -65,6 +73,8 @@ class Store:
         """Append an event to the run timeline and (optionally) publish it."""
         ev = self.make_event(type_, run.id, data)
         run.events.append(ev)
+        if type_ in HISTORY_TYPES:
+            self._record_history(run, ev)
         if publish:
             self.publish(ev)
         return ev
@@ -88,6 +98,36 @@ class Store:
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
         self._subscribers.discard(q)
+
+    # ---- history ----------------------------------------------------------
+    def _load_history(self) -> None:
+        try:
+            with open(HISTORY_PATH) as f:
+                for line in f:
+                    try:
+                        self.history.append(json.loads(line))
+                    except ValueError:
+                        continue
+        except OSError:
+            pass
+
+    def _record_history(self, run: RunState, ev: dict[str, Any]) -> None:
+        entry = {**ev, "run_name": run.name, "spent_usd": run.spent_usd, "step": len(run.steps)}
+        self.history.append(entry)
+        try:
+            os.makedirs(os.path.dirname(HISTORY_PATH) or ".", exist_ok=True)
+            with open(HISTORY_PATH, "a") as f:
+                f.write(json.dumps(entry, default=str) + "\n")
+        except OSError:
+            pass  # history is best-effort; never break the proxy over it
+        self.publish(self.make_event("history", run.id, entry))
+
+    def clear_history(self) -> None:
+        self.history.clear()
+        try:
+            open(HISTORY_PATH, "w").close()
+        except OSError:
+            pass
 
     # ---- stats ------------------------------------------------------------
     def stats(self) -> dict[str, Any]:

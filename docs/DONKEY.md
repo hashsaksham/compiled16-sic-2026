@@ -16,6 +16,7 @@
   - The "practice world" (a fake AI + five demo characters): the full demo test passes.
 - **Phase 5 (putting it together): done.** We ran the real system with the real screen. Every character ended the way we planned: *good* finished untouched, *oscillator* got a nudge and fixed itself, *looper* was paused and a human pressed **Kill** on the screen, *retrier* was paused and then stopped automatically when nobody answered, and *spender* was switched to a cheaper AI model and then stopped at its budget. Projected waste avoided: about $9.38, against $1.20 actually spent. All 53 automatic checks pass.
 - **Real Claude test: done.** We gave the real Claude AI a job and told it "keep retrying, never give up", but the service it needed was broken. After three identical failures, Tripwire whispered a warning. Claude changed course and wrote an honest "I couldn't do this, here's why" report. It cost about 3 cents. The first try showed a mistake in Tripwire: it was still holding Claude's *old* failures against it after Claude had already changed course, a bit like a referee still punishing a player for a foul they stopped making. We fixed it so that after a warning, Tripwire only judges what the agent does *next*.
+- **Dashboard made calmer: done.** The control-room screen now looks like a tidy to-do list instead of a wall of flashing boxes. Each agent is one row. A row of 4 little dots shows which of the 4 steps (Nudge, Downgrade, Pause, Stop) Tripwire has used. Agents waiting for you sit in an orange "Needs you" strip at the top, with a 3-minute countdown before they stop by themselves. A History tab keeps a permanent diary of everything Tripwire did. It stays even after a reset and can be exported. It was tested with 60 agents at once and still reads easily.
 - **Still left (Phase 6):** practise the 2-minute demo and submit the form before 6:30 PM. That needs a person at the event. An optional extra is a run with the real Claude AI, which needs an API key.
 
 ---
@@ -175,7 +176,7 @@ Tripwire always tries the gentlest fix first, and only gets firmer if the proble
 **What it does:** Tripwire holds the agent's next message and doesn't pass it on. The dashboard shows big **Approve** and **Kill** buttons. A human decides.
 - **Approve** lets the agent carry on, and gives it a fresh chance.
 - **Kill** stops it.
-- If nobody answers within 45 seconds, Tripwire stops it anyway, so a forgotten pause can't block things forever.
+- If nobody answers within 3 minutes, Tripwire stops it anyway, so a forgotten pause can't block things forever.
 
 **Analogy:** your bank texting you, "Did you just try to spend $900 in another country? Reply YES or NO." The payment waits until you answer.
 
@@ -212,7 +213,7 @@ For the demo we don't use a real AI. We use a **fake AI** (we call it the "mock"
 
 ### 2. "Looper": the fridge-opener
 **The story:** Looper wants Acme Corp's Q3 2026 revenue. It searches the web for exactly the same phrase. "No results found." It searches again. And again. Even when nudged, it ignores the note and keeps searching.
-**What the audience sees:** the card's stuck score climbs. A yellow "Nudged" appears in the live feed. Looper keeps going. Then the card switches to **Paused** with big Approve and Kill buttons. We press **Kill** on stage. The card turns red and the money-saved counter jumps. (If nobody pressed anything, it would be killed after 45 seconds anyway.)
+**What the audience sees:** the card's stuck score climbs. A yellow "Nudged" appears in the live feed. Looper keeps going. Then the card switches to **Paused** with big Approve and Kill buttons. We press **Kill** on stage. The card turns red and the money-saved counter jumps. (If nobody pressed anything, it would be killed after 3 minutes anyway.)
 
 ### 3. "Oscillator": the thermostat fighter
 **The story:** Oscillator can't decide whether a setting in a file should be "fast" or "safe". It writes "fast". Then "safe". Then "fast". Then "safe". Then Tripwire nudges it. Oscillator reads the note and replies, more or less, "You're right, I'll stop flip-flopping. I'll pick 'safe' and add a comment explaining why." It does one different thing and finishes.
@@ -327,7 +328,7 @@ The project is split into 7 phases (0 to 6). Each has a goal, a set of tasks, an
 5. **Carry out the decision:**
    - **Nudge:** add the "[TRIPWIRE SUPERVISOR NOTICE]" note to the agent's instructions, mark the run "nudged", count the nudge, and restart the "steps since nudge" counter.
    - **Downgrade:** remember the cheaper model and mark the run "downgraded".
-   - **Pause:** mark the run "paused" and hold this message for up to 45 seconds while waiting for a human. Approve or resume lets it continue with a fresh chance. Kill, or no answer in time, means kill.
+   - **Pause:** mark the run "paused" and hold this message for up to 3 minutes while waiting for a human. Approve or resume lets it continue with a fresh chance. Kill, or no answer in time, means kill.
    - **Kill:** mark it "killed", record why, work out the money saved, and send the polite stop.
    - **Always:** if a cheaper model has been chosen, make sure this message goes to it.
    - Any action other than "do nothing" gets posted on the noticeboard.
@@ -353,7 +354,7 @@ The **live stream** uses something called SSE ("server-sent events"). Think of i
 
 **What could go wrong:**
 - **Changing things it shouldn't.** If the middleman alters replies when nothing is wrong, it could break agents. The "invisible when nothing's wrong" test guards against this.
-- **A pause that never ends.** If nobody presses a button, the agent would hang forever. The 45-second timeout fixes this.
+- **A pause that never ends.** If nobody presses a button, the agent would hang forever. The 3-minute timeout fixes this.
 - **Crashing the agent on stop.** Sending an error instead of the polite stop would crash most agents. We always use the polite stop.
 - **Streaming agents.** Many agents use streaming by default. For now we refuse clearly. Supporting it is a stretch goal.
 
@@ -415,7 +416,7 @@ The **live stream** uses something called SSE ("server-sent events"). Think of i
 - **One command runs the full demo**, and it finishes in under 3 minutes.
 - **Every character ends up where it should:** Good completed, Oscillator recovered, Looper and Retrier killed after a pause, Spender downgraded then killed.
 - **Stopped agents exit cleanly**: no scary error screens when Tripwire stops them.
-- **The end-to-end test passes.** It starts both servers on random free addresses (so it won't clash with anything else running), shortens the pause wait from 45 seconds to 3 seconds so the test doesn't take forever, and checks all five outcomes.
+- **The end-to-end test passes.** It starts both servers on random free addresses (so it won't clash with anything else running), shortens the pause wait from 3 minutes to 3 seconds so the test doesn't take forever, and checks all five outcomes.
 
 **What could go wrong:**
 - **The fake AI isn't realistic enough**, so the demo "works" but real agents wouldn't. Fix: it uses exactly the real format, and the agent uses the real official toolkit.
@@ -481,7 +482,7 @@ The **live stream** uses something called SSE ("server-sent events"). Think of i
 - **False alarms annoy people** → the healthy "Good" character must get zero warnings, we always nudge before doing anything harsh, and a human approves pauses.
 - **Agents that use streaming** → refused with a clear message in version 1; support is a stretch goal.
 - **Agents crashing when stopped** → the polite stop instead of an error.
-- **A pause blocking forever** → after 45 seconds with no answer, the run is stopped.
+- **A pause blocking forever** → after 3 minutes with no answer, the run is stopped.
 
 ---
 
@@ -492,7 +493,7 @@ These are adjustable without touching any code (they're set as "environment vari
 - **Tripwire's address (port):** 8787 by default. A "port" is like a door number on the computer; different programs listen at different doors.
 - **Where to send messages:** the fake AI at 8788 by default, or the real Anthropic service.
 - **Default budget per run:** $1.00.
-- **How long a pause waits for a human:** 45 seconds.
+- **How long a pause waits for a human:** 3 minutes.
 - **How many steps we assume a stuck run would have taken** (for the money-saved estimate): 100.
 
 ---

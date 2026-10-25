@@ -35,11 +35,11 @@ from server.store import DEFAULT_BUDGET, store
 
 # ---- config (§7) -----------------------------------------------------------
 PORT = int(os.environ.get("TRIPWIRE_PORT", "8787"))
-PAUSE_TIMEOUT = float(os.environ.get("TRIPWIRE_PAUSE_TIMEOUT", "45"))
+PAUSE_TIMEOUT = float(os.environ.get("TRIPWIRE_PAUSE_TIMEOUT", "180"))
 ASSUMED_HORIZON = int(os.environ.get("TRIPWIRE_ASSUMED_HORIZON", "100"))
 NUDGE_PREFIX = "\n\n[TRIPWIRE SUPERVISOR NOTICE] "
 RECOVERY_THRESHOLD = 0.5
-RECOVERY_STREAK = 2
+RECOVERY_STREAK = 3  # calm analyses after a nudge before "recovered"; 3 so the post-nudge window has enough steps to judge
 SSE_PING_SECONDS = 15.0
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -214,12 +214,15 @@ async def wait_for_human(run: RunState) -> str:
     ev = asyncio.Event()
     store.pause_events[run.id] = ev
     store.pause_verdicts.pop(run.id, None)
+    run.pause_deadline = time.time() + PAUSE_TIMEOUT
+    store.publish_run(run)
     try:
         await asyncio.wait_for(ev.wait(), timeout=PAUSE_TIMEOUT)
         return store.pause_verdicts.pop(run.id, "kill")
     except asyncio.TimeoutError:
         return "timeout"
     finally:
+        run.pause_deadline = 0.0
         if store.pause_events.get(run.id) is ev:
             store.pause_events.pop(run.id, None)
 
@@ -478,6 +481,28 @@ async def reset_all() -> dict[str, Any]:
     store.publish(store.make_event("reset", None, {}))
     store.publish(store.make_event("stats", None, stats_now))
     return {"ok": True, "stats": stats_now}
+
+
+@app.get("/api/history")
+async def history(run: str = "", action: str = "", limit: int = 500) -> list[dict[str, Any]]:
+    """Saved feed (newest first). Filter by run id and/or intervention action (nudge|downgrade|pause|kill)."""
+    out = []
+    for e in reversed(store.history):
+        if run and e.get("run_id") != run:
+            continue
+        if action and (e.get("type") != "intervention" or e.get("data", {}).get("action") != action):
+            continue
+        out.append(e)
+        if len(out) >= limit:
+            break
+    return out
+
+
+@app.delete("/api/history")
+async def clear_history() -> dict[str, Any]:
+    store.clear_history()
+    store.publish(store.make_event("history_cleared", None, {}))
+    return {"ok": True}
 
 
 @app.get("/api/health")

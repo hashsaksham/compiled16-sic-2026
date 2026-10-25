@@ -44,7 +44,8 @@ def servers(tmp_path_factory):
     logdir = tmp_path_factory.mktemp("e2e_logs")
     mock_port, tw_port = _free_port(), _free_port()
     env = dict(os.environ, TRIPWIRE_PAUSE_TIMEOUT="3", TRIPWIRE_UPSTREAM=f"http://127.0.0.1:{mock_port}",
-               TRIPWIRE_PORT=str(tw_port), PYTHONUNBUFFERED="1")
+               TRIPWIRE_PORT=str(tw_port), PYTHONUNBUFFERED="1",
+               TRIPWIRE_HISTORY=str(logdir / "history.jsonl"))
     env.pop("ANTHROPIC_API_KEY", None)
     procs = []
     try:
@@ -124,3 +125,14 @@ def test_spender_downgraded_then_killed(outcome):
     models = {s["model"] for s in outcome["details"]["spender"]["steps"]}
     assert {"mock-large", "mock-small"} <= models, models
     assert r["model"] == "mock-small", r
+
+
+def test_history_records_interventions_and_outcomes(servers, outcome):
+    hist = httpx.get(f"{servers['tripwire']}/api/history?limit=1000").json()
+    types = {e["type"] for e in hist}
+    assert {"created", "intervention", "killed", "completed"} <= types
+    actions = {e["data"]["action"] for e in hist if e["type"] == "intervention"}
+    assert {"nudge", "downgrade", "pause"} <= actions
+    assert all(e.get("run_name") for e in hist)
+    only_nudges = httpx.get(f"{servers['tripwire']}/api/history?action=nudge").json()
+    assert only_nudges and all(e["data"]["action"] == "nudge" for e in only_nudges)

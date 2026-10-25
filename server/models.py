@@ -110,6 +110,7 @@ class RunState:
     events: list[dict[str, Any]] = field(default_factory=list)  # timeline of signal/intervention/status events
     saved_usd: float = 0.0  # projected waste avoided (set when killed)
     kill_reason: str = ""
+    pause_deadline: float = 0.0  # epoch seconds when a held (paused) request auto-stops; 0 = not paused
 
     @property
     def spent_usd(self) -> float:
@@ -127,6 +128,13 @@ class RunState:
         recent = self.steps[-window:]
         return sum(s.cost_usd for s in recent) / len(recent) if recent else 0.0
 
+    def last_action(self) -> Optional[dict[str, Any]]:
+        """Most recent intervention: {action, reason, ts} (action is nudge|downgrade|pause|kill)."""
+        for e in reversed(self.events):
+            if e["type"] == "intervention":
+                return {"action": e["data"].get("action"), "reason": e["data"].get("reason", ""), "ts": e["ts"]}
+        return None
+
     def summary(self) -> dict[str, Any]:
         """Shape returned by GET /api/runs and pushed as SSE `run_update`."""
         return {
@@ -143,6 +151,9 @@ class RunState:
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "model": self.downgrade_to or self.model,
+            "original_model": self.model,
+            "pause_deadline": self.pause_deadline,
+            "last_action": self.last_action(),
             "stuck_score": round(self.stuck_score, 3),
             "level": self.level,
             "signals": [s.to_dict() for s in self.signals],

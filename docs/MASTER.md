@@ -118,7 +118,7 @@ Defined in `server/models.py` — `ToolCall`, `ToolResult`, `Step`, `Signal`, `D
 5. Apply decision:
    - `nudge`: append `"\n\n[TRIPWIRE SUPERVISOR NOTICE] " + nudge_text` to the `system` field (string → concatenate; list of blocks → add a text block; missing → set). Status `nudged`, `nudges_sent += 1`, `steps_since_nudge = 0`.
    - `downgrade`: set `run.downgrade_to`; status `downgraded`.
-   - `pause`: status `paused`; await an `asyncio.Event` up to `TRIPWIRE_PAUSE_TIMEOUT` (default 45 s). Human `approve`/`resume` → continue; `run.level` stays at `LEVEL_PAUSE` and `steps_since_nudge` resets to 0, so the agent gets 2 more steps and is killed if still stuck (see policy); `kill` or timeout → kill.
+   - `pause`: status `paused`; await an `asyncio.Event` up to `TRIPWIRE_PAUSE_TIMEOUT` (default 180 s = 3 min). Human `approve`/`resume` → continue; `run.level` stays at `LEVEL_PAUSE` and `steps_since_nudge` resets to 0, so the agent gets 2 more steps and is killed if still stuck (see policy); `kill` or timeout → kill.
    - `kill`: status `killed`, set `kill_reason`, compute `saved_usd`, return synthetic stop.
    - Always: if `run.downgrade_to` set, overwrite `body["model"]`.
    - Record the decision in an `intervention` event if action != none.
@@ -199,7 +199,7 @@ Uses `anthropic.Anthropic(base_url=f"{TRIPWIRE}/r/{run_id}", api_key=..., defaul
 | `TRIPWIRE_PORT` | 8787 |
 | `TRIPWIRE_UPSTREAM` | `http://localhost:8788` (mock); `https://api.anthropic.com` for real |
 | `TRIPWIRE_DEFAULT_BUDGET` | 1.00 |
-| `TRIPWIRE_PAUSE_TIMEOUT` | 45 |
+| `TRIPWIRE_PAUSE_TIMEOUT` | 180 (3 min) |
 | `TRIPWIRE_ASSUMED_HORIZON` | 100 |
 
 ## 8. Phases, tasks and test checklists
@@ -294,3 +294,6 @@ Built with **Claude Code** (Opus 5.5). Approach: the lead agent wrote this maste
 - Phase 5: live integration on :8787/:8788, browser-tested. Outcomes: good completed (0 nudges), oscillator nudged→recovered→completed, looper paused→**killed by human from dashboard**, retrier paused→timeout kill, spender mock-large→mock-small→budget kill at step 15. Total spent $1.20, projected waste avoided $9.38. Full suite: 53 passed. Fixed: uvicorn `--timeout-graceful-shutdown 2` so open SSE streams don't block restarts.
 - Remaining: optional real-Claude run (needs `ANTHROPIC_API_KEY`), rehearse pitch, submit form (human, at venue).
 - Real-Claude run (`scripts/real.sh`, claude-sonnet-5-5, key from gitignored `.env`; Tripwire sends `claude-*` models to api.anthropic.com and everything else to the mock). **First run found a false positive:** Claude changed course after the nudge, but the 8-step window still held the pre-nudge 503s, so it was paused and then killed at the timeout. **Fix (detectors.py):** behavioural detectors (repeat_tool_call, repeat_error, oscillation, semantic_loop) only look at steps from the most recent nudge/pause onward, so the agent is judged on what it did after the warning. 2 regression tests added; 55 tests pass. **Re-run:** nudged once → recovered → completed with an honest failure report, $0.034. The ticked Phase 5 real-model item now has a stronger demo beat: "told never to give up, Tripwire talked it into stopping honestly."
+- Owner request: pause auto-stop timeout raised from 45 s to 180 s (3 min) — default in server/app.py and scripts/start.sh. Real-Claude script (`scripts/real.sh`) is only run with the owner's explicit go-ahead each time.
+- Dashboard v2 (owner feedback: too cluttered, must scale to 100 agents): calm list view, one row per run with a 4-dot Nudge→Downgrade→Pause→Stop ladder, a 'Needs you' strip with m:ss auto-stop countdowns, Runs/History tabs, filters, search, sort, and a side drawer for details. Users see 'Stop' (backend: kill). Tested with 60 synthetic runs at 1280×720 and on a phone.
+- Backend for v2: saved history (`logs/history.jsonl`, `GET/DELETE /api/history`, SSE `history`), survives resets and restarts; `RunState.pause_deadline`, `original_model`, `last_action` in the summary. Recovery now needs 3 calm analyses (it was 2, which flagged stuck agents as 'recovered' just before pausing them). 56 tests pass. Demo video kit: docs/PITCH.md.
